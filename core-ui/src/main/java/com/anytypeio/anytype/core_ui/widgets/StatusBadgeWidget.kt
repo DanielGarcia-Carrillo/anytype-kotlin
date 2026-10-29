@@ -34,7 +34,11 @@ class StatusBadgeWidget @JvmOverloads constructor(
                 when (val spaceSyncUpdate = status.spaceSyncUpdate) {
                     is SpaceSyncUpdate.Update -> {
                         val error = spaceSyncUpdate.error
-                        if (error != SpaceSyncError.NULL) {
+                        if (error == SpaceSyncError.STORAGE_LIMIT_EXCEED) {
+                            // objects still sync at the storage limit, only files stop
+                            visible()
+                            setImageResource(R.drawable.ic_sync_slow_8)
+                        } else if (error != SpaceSyncError.NULL) {
                             visible()
                             setImageResource(R.drawable.ic_sync_error_8)
                         } else {

@@ -57,7 +57,14 @@ fun StatusBadge(
                         modifier = modifier,
                         contentAlignment = Alignment.Center
                     ) {
-                        if (spaceSyncUpdate.error != SpaceSyncError.NULL) {
+                        if (spaceSyncUpdate.error == SpaceSyncError.STORAGE_LIMIT_EXCEED) {
+                            // objects still sync at the storage limit, only files stop
+                            Image(
+                                painter = painterResource(R.drawable.ic_sync_slow_8),
+                                contentDescription = "Storage limit reached",
+                                modifier = Modifier.size(8.dp)
+                            )
+                        } else if (spaceSyncUpdate.error != SpaceSyncError.NULL) {
                             Image(
                                 painter = painterResource(R.drawable.ic_sync_error_8),
                                 contentDescription = null,

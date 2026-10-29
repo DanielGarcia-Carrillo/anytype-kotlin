@@ -252,7 +252,7 @@ private fun getP2PCardSettings(
             )
         }
 
-        P2PStatus.NOT_POSSIBLE, P2PStatus.RESTRICTED -> {
+        P2PStatus.NOT_POSSIBLE -> {
             CardSettings(
                 icon = painterResource(R.drawable.ic_sync_p2p_default),
                 mainText = stringResource(id = R.string.sync_status_p2p),
@@ -275,7 +275,7 @@ private fun getP2PCardSettings(
             CardSettings(
                 icon = painterResource(R.drawable.ic_sync_p2p_error),
                 mainText = stringResource(id = R.string.sync_status_p2p),
-                secondaryText = stringResource(id = R.string.sync_status_p2p_disabled)
+                secondaryText = stringResource(id = R.string.sync_status_p2p_restricted)
             )
         }
     }
@@ -290,6 +290,15 @@ private fun getNetworkCardSettings(
 ): CardSettings {
     when (network) {
         SpaceSyncNetwork.ANYTYPE -> {
+
+            // Only file uploads stop at the storage limit: objects keep syncing.
+            if (error == SpaceSyncError.STORAGE_LIMIT_EXCEED) {
+                return CardSettings(
+                    icon = painterResource(R.drawable.ic_sync_limitations),
+                    mainText = stringResource(id = R.string.sync_status_anytype_network),
+                    secondaryText = stringResource(id = R.string.sync_status_storage_limit_exceed)
+                )
+            }
 
             if (error != SpaceSyncError.NULL) {
                 return CardSettings(
