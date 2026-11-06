@@ -163,6 +163,19 @@ sealed class Viewer {
         )
     }
 
+    /**
+     * Month calendar. Holds only the view configuration: the objects of the visible months come
+     * from a dedicated date-range subscription and reach the screen as [CalendarViewState].
+     */
+    data class Calendar(
+        override val id: String,
+        override val title: String,
+        /** The date property that places an object on a day; null when the view has no usable one. */
+        val dateRelationKey: String?,
+        val dateRelationName: String? = null,
+        val hideIcon: Boolean = false
+    ) : Viewer()
+
     enum class SortType { ASC, DESC, CUSTOM }
     enum class FilterOperator { And, Or, No }
 

@@ -411,6 +411,14 @@ open class ObjectSetFragment :
                 onColumnLoadMore = { columnId -> vm.onBoardColumnLoadMore(columnId) }
                 onCreateInColumn = { columnId -> vm.onBoardCreateObjectInColumn(columnId) }
             }
+            // The calendar is hosted the same way: one composition, fed in setViewer and by
+            // vm.calendarState. See CalendarViewWidget.
+            binding.calendarView.apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                onMonthChanged = { month -> vm.onCalendarMonthChanged(month) }
+                onObjectClicked = { id -> vm.onCalendarObjectClicked(id) }
+                onCreateObject = { date -> vm.onCalendarCreateObject(date) }
+            }
             binding.topToolbar.container.setOnClickListener {
                 WidgetOverlayFragment.show(parentFragmentManager, space)
             }
@@ -676,6 +684,7 @@ open class ObjectSetFragment :
             viewBinding.listView.updatePadding(bottom = listBottomPadding + bottom)
             viewBinding.galleryView.updatePadding(bottom = galleryBottomPadding + bottom)
             viewBinding.boardView.setBottomContentInset(bottom)
+            viewBinding.calendarView.setBottomContentInset(bottom)
             viewBinding.bottomSystemBarProtection.updateLayoutParams { height = bottom }
         }
         if (hasExternalHeader) {
@@ -1317,6 +1326,8 @@ open class ObjectSetFragment :
                     listView.setViews(emptyList())
                     boardView.gone()
                     boardView.clear()
+                    calendarView.gone()
+                    calendarView.clear()
                 }
                 viewerGridHeaderAdapter.submitList(viewer.columns)
                 viewerGridAdapter.submitList(viewer.rows, onCommitted)
@@ -1337,6 +1348,8 @@ open class ObjectSetFragment :
                     )
                     boardView.gone()
                     boardView.clear()
+                    calendarView.gone()
+                    calendarView.clear()
                 }
             }
             is Viewer.ListView -> {
@@ -1351,6 +1364,8 @@ open class ObjectSetFragment :
                     listView.setViews(viewer.items, onCommitted)
                     boardView.gone()
                     boardView.clear()
+                    calendarView.gone()
+                    calendarView.clear()
                 }
             }
             is Viewer.Board -> {
@@ -1363,12 +1378,31 @@ open class ObjectSetFragment :
                     galleryView.clear()
                     listView.gone()
                     listView.setViews(emptyList())
+                    calendarView.gone()
+                    calendarView.clear()
                     boardView.visible()
                     // Set the create permission here — co-located with board rendering — so any
                     // viewer-rendering state that routes through setViewer() can't forget it and
                     // silently hide the per-column "＋ New" affordance (widget default is false).
                     boardView.canCreateObject = canCreateObject
                     boardView.setBoard(viewer)
+                }
+            }
+            is Viewer.Calendar -> {
+                viewerGridHeaderAdapter.submitList(emptyList())
+                viewerGridAdapter.submitList(emptyList())
+                with(binding) {
+                    unsupportedViewError.gone()
+                    unsupportedViewError.text = null
+                    galleryView.gone()
+                    galleryView.clear()
+                    listView.gone()
+                    listView.setViews(emptyList())
+                    boardView.gone()
+                    boardView.clear()
+                    calendarView.canCreateObject = canCreateObject
+                    calendarView.setCalendar(viewer)
+                    calendarView.visible()
                 }
             }
             is Viewer.Unsupported -> {
@@ -1381,6 +1415,8 @@ open class ObjectSetFragment :
                     listView.setViews(emptyList())
                     boardView.gone()
                     boardView.clear()
+                    calendarView.gone()
+                    calendarView.clear()
                     when(viewer.type) {
                         Viewer.Unsupported.TYPE_GRAPH -> {
                             unsupportedViewError.setText(R.string.error_graph_view_not_supported)
@@ -1408,6 +1444,8 @@ open class ObjectSetFragment :
                     listView.setViews(emptyList())
                     boardView.gone()
                     boardView.clear()
+                    calendarView.gone()
+                    calendarView.clear()
                     unsupportedViewError.gone()
                     unsupportedViewError.text = null
                 }
@@ -1417,7 +1455,8 @@ open class ObjectSetFragment :
 
     private fun updatePaginatorVisibility() {
         // Kanban loads more records within each column, without a shared page selector.
-        binding.paginatorToolbar.isVisible = paginationPageCount > 1 && activeViewer !is Viewer.Board
+        binding.paginatorToolbar.isVisible = paginationPageCount > 1 &&
+                activeViewer !is Viewer.Board && activeViewer !is Viewer.Calendar
     }
 
     private fun activeRecyclerView(): RecyclerView? = when (activeViewer) {
@@ -2092,6 +2131,7 @@ open class ObjectSetFragment :
             }
         }
         jobs += lifecycleScope.subscribe(vm.toasts) { toast(it) }
+        jobs += lifecycleScope.subscribe(vm.calendarState) { binding.calendarView.setState(it) }
 
         jobs += lifecycleScope.subscribe(vm.spaceSyncStatus) { setStatus(it) }
 
@@ -2136,6 +2176,7 @@ open class ObjectSetFragment :
         binding.scrollHost.cancelMotion()
         binding.scrollHost.setStableViewportChild(null)
         binding.boardView.clear()
+        binding.calendarView.clear()
         activeViewer = null
         paginationPageCount = 0
         lastContentSelection = null
