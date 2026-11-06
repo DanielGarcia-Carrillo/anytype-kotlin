@@ -28,6 +28,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.anytypeio.anytype.core_models.DVViewerType
 import com.anytypeio.anytype.core_ui.R
 import com.anytypeio.anytype.core_ui.extensions.contentWidthDp
 import com.anytypeio.anytype.core_ui.extensions.simpleIcon
@@ -74,7 +75,11 @@ private fun ColumnScope.GroupByContent(
     Spacer(modifier = Modifier.height(12.dp))
     Text(
         modifier = Modifier.align(Alignment.CenterHorizontally),
-        text = stringResource(R.string.view_layout_group_by_widget_title),
+        text = if (uiState.layoutType == DVViewerType.CALENDAR) {
+            stringResource(R.string.calendar_date_property)
+        } else {
+            stringResource(R.string.view_layout_group_by_widget_title)
+        },
         style = Title1,
         color = colorResource(R.color.text_primary)
     )
