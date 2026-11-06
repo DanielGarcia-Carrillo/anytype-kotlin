@@ -15,6 +15,7 @@ dokkaVersion = '1.9.20'
 
 activityComposeVersion = '1.10.1'
 composeReorderableVersion = '2.5.1'
+composeCalendarVersion = '2.7.0'
 accompanistVersion = "0.34.0"
 appcompatVersion = '1.7.0'
 fragmentVersion = "1.8.6"
@@ -88,6 +89,7 @@ composeAccompanistPagerIndicators = { module = "com.google.accompanist:accompani
 composeAccompanistThemeAdapter = { module = "com.google.accompanist:accompanist-themeadapter-material", version.ref = "accompanistVersion" }
 composeAccompanistNavigation = { module = "com.google.accompanist:accompanist-navigation-material", version.ref = "accompanistVersion" }
 composeReorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "composeReorderableVersion" }
+composeCalendar = { module = "com.kizitonwose.calendar:compose", version.ref = "composeCalendarVersion" }
 composeConstraintLayout = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "composeConstraintLayoutVersion" }
 kotlinxSerializationJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.6.3" }
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompatVersion" }

@@ -155,6 +155,12 @@ import com.anytypeio.anytype.presentation.widgets.enterEditing
 import com.anytypeio.anytype.presentation.widgets.exitEditing
 import com.anytypeio.anytype.presentation.widgets.hideMoreMenu
 import com.anytypeio.anytype.presentation.widgets.showMoreMenu
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.temporal.WeekFields
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -390,6 +396,24 @@ class ObjectSetViewModel(
      * an explicit error instead of an eternal loading/empty board. Cleared in [onStop].
      */
     private val boardSubscriptionError = MutableStateFlow<Throwable?>(null)
+
+    /** The month the calendar view shows; the calendar's subscription follows it. */
+    private val calendarMonth = MutableStateFlow(YearMonth.now())
+
+    /** First day of the week for the device locale; the UI and the loaded range share it. */
+    private val calendarFirstDayOfWeek: DayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
+
+    private val _calendarState = MutableStateFlow(
+        CalendarViewState(month = calendarMonth.value, firstDayOfWeek = calendarFirstDayOfWeek)
+    )
+
+    /** Objects of the visible calendar months, grouped by day. See [subscribeToCalendarRecords]. */
+    val calendarState: StateFlow<CalendarViewState> = _calendarState.asStateFlow()
+
+    /** Objects of the current calendar range by id, to open one the shared store does not hold. */
+    private var calendarObjects: Map<Id, ObjectWrapper.Basic> = emptyMap()
+
+    private val calendarSubscriptionId = "${vmParams.ctx}$SUBSCRIPTION_CALENDAR_POSTFIX"
 
     /** Fires a board re-render whenever any board-specific flow changes. */
     private val boardRenderTrigger = combine(
@@ -784,6 +808,7 @@ class ObjectSetViewModel(
         subscribeToDataViewRelationOptions()
         subscribeToBoardGroups()
         subscribeToBoardRecords()
+        subscribeToCalendarRecords()
         proceedWithOpeningCurrentObject(ctx = vmParams.ctx)
         proceedWithObservingSyncStatus()
     }
@@ -831,10 +856,13 @@ class ObjectSetViewModel(
                 }
                 .flatMapLatest { (query, fingerprint) ->
                 val activeViewer = query.state.dataViewStateOrNull()?.viewerByIdOrFirst(query.currentViewerId)
-                if (activeViewer?.type == DVViewerType.BOARD && isKanbanEnabled.value) {
+                if ((activeViewer?.type == DVViewerType.BOARD && isKanbanEnabled.value)
+                    || activeViewer?.type == DVViewerType.CALENDAR
+                ) {
                     // An enabled board is driven entirely by per-column record subscriptions
                     // (subscribeToBoardRecords), not the single flat 50-record window. When the
                     // experimental flag is off the board is unsupported, so the normal sub runs.
+                    // A calendar loads its visible months through subscribeToCalendarRecords.
                     return@flatMapLatest flowOf(SubscriptionResult(fingerprint,
                         DataViewState.Loaded(objects = emptyList(), dependencies = emptyList())))
                 }
@@ -1163,6 +1191,235 @@ class ObjectSetViewModel(
             collection = collection,
             limit = DEFAULT_LIMIT
         )
+    }
+
+    /**
+     * Subscribes to the objects whose date property falls in the calendar's visible months (the
+     * shown month and both neighbours), with the view's filters and sorts. Re-subscribes when the
+     * month, the view or its query changes; drops the subscription when leaving a calendar.
+     */
+    private fun subscribeToCalendarRecords() {
+        jobs += viewModelScope.launch {
+            // Wait for the previous stop's backend unsubscribe (same subscription id) before
+            // issuing any new subscribe request — see [unsubscribeJob].
+            unsubscribeJob?.join()
+            combine(
+                stateReducer.state,
+                session.currentViewerId,
+                calendarMonth,
+                // The date property's format and the filter formats resolve against the store.
+                storeOfRelations.trackChanges()
+            ) { state, currentViewId, month, _ ->
+                val dataView = state.dataViewStateOrNull()
+                val viewer = dataView?.viewerByIdOrFirst(currentViewId)
+                if (dataView != null && dataView.isInitialized && viewer?.type == DVViewerType.CALENDAR) {
+                    buildCalendarQuery(dataView, viewer, month)
+                } else {
+                    null
+                }
+            }
+                .distinctUntilChanged()
+                .flatMapLatest<CalendarQuery?, Pair<CalendarQuery?, List<ObjectWrapper.Basic>>> { query ->
+                    val search = query?.search
+                    if (search == null) {
+                        storelessSubscriptionContainer.unsubscribe(listOf(calendarSubscriptionId))
+                        flowOf(query to emptyList())
+                    } else {
+                        _calendarState.update { current ->
+                            val sameView = current.viewerId == query.viewerId &&
+                                    current.dateRelationKey == query.relation?.key
+                            current.copy(
+                                viewerId = query.viewerId,
+                                month = query.month,
+                                dateRelationKey = query.relation?.key,
+                                isDateRelationReadonly = query.relation?.isReadonlyValue == true,
+                                // Keep the neighbour months' objects on screen while the range moves.
+                                itemsByDate = if (sameView) current.itemsByDate else emptyMap(),
+                                isLoading = true
+                            )
+                        }
+                        storelessSubscriptionContainer.subscribe(search).map { query to it }
+                    }
+                }
+                .catch { e ->
+                    Timber.e(e, "Error in calendar records subscription")
+                    emit(null to emptyList())
+                }
+                .collect { (query, objects) ->
+                    calendarObjects = objects.associateBy { it.id }
+                    val relation = query?.relation
+                    val items = if (query != null && relation != null && query.search != null) {
+                        groupCalendarItems(
+                            objects = objects,
+                            relationKey = relation.key,
+                            from = query.from,
+                            to = query.to,
+                            zone = ZoneId.systemDefault(),
+                            urlBuilder = urlBuilder,
+                            fieldParser = fieldParser,
+                            storeOfObjectTypes = storeOfObjectTypes
+                        )
+                    } else {
+                        emptyMap()
+                    }
+                    _calendarState.value = CalendarViewState(
+                        viewerId = query?.viewerId,
+                        month = query?.month ?: calendarMonth.value,
+                        firstDayOfWeek = calendarFirstDayOfWeek,
+                        dateRelationKey = relation?.key,
+                        isDateRelationReadonly = relation?.isReadonlyValue == true,
+                        itemsByDate = items,
+                        isLoading = false,
+                        isTruncated = objects.size >= CALENDAR_RECORD_LIMIT
+                    )
+                }
+        }
+    }
+
+    private data class CalendarQuery(
+        val viewerId: Id,
+        val month: YearMonth,
+        val relation: CalendarDateRelation?,
+        val from: LocalDate,
+        val to: LocalDate,
+        /** Null when the view has no usable date property: nothing to load. */
+        val search: StoreSearchParams?
+    )
+
+    private suspend fun buildCalendarQuery(
+        state: ObjectState.DataView,
+        viewer: DVViewer,
+        month: YearMonth
+    ): CalendarQuery {
+        val (from, to) = calendarLoadRange(month, calendarFirstDayOfWeek)
+        val relation = viewer.calendarDateRelation(storeOfRelations)
+            ?: return CalendarQuery(viewer.id, month, null, from, to, null)
+        val filters = buildList {
+            addAll(viewer.filters.updateFormatForSubscription(storeOfRelations).removeUnsupportedFilters())
+            addAll(defaultDataViewFilters())
+            addAll(calendarRangeFilters(relation.key, from, to, ZoneId.systemDefault()))
+        }
+        val sorts = viewer.sorts.ifEmpty {
+            listOf(
+                DVSort(
+                    relationKey = relation.key,
+                    type = DVSortType.ASC,
+                    includeTime = true,
+                    relationFormat = RelationFormat.DATE
+                )
+            )
+        }.updateWithRelationFormat(storeOfRelations)
+        val sources: List<String>
+        val collection: Id?
+        when (state) {
+            is ObjectState.DataView.Collection -> {
+                sources = emptyList()
+                collection = vmParams.ctx
+            }
+            is ObjectState.DataView.Set -> {
+                sources = state.filterOutDeletedAndMissingObjects(state.getSetOfValue(vmParams.ctx))
+                collection = null
+            }
+            is ObjectState.DataView.TypeSet -> {
+                sources = state.filterOutDeletedAndMissingObjects(state.getSetOfValue(vmParams.ctx))
+                collection = null
+            }
+        }
+        if (collection == null && sources.isEmpty()) {
+            // A set without a query matches nothing; the screen shows its "no query" state.
+            return CalendarQuery(viewer.id, month, relation, from, to, null)
+        }
+        val keys = (defaultDataViewKeys + relation.key).distinct()
+        return CalendarQuery(
+            viewerId = viewer.id,
+            month = month,
+            relation = relation,
+            from = from,
+            to = to,
+            search = StoreSearchParams(
+                space = vmParams.space,
+                subscription = calendarSubscriptionId,
+                filters = filters,
+                sorts = sorts,
+                keys = keys,
+                source = sources,
+                collection = collection,
+                limit = CALENDAR_RECORD_LIMIT
+            )
+        )
+    }
+
+    /** The calendar settled on another month; its subscription moves along. */
+    fun onCalendarMonthChanged(month: YearMonth) {
+        if (calendarMonth.value != month) calendarMonth.value = month
+    }
+
+    fun onCalendarObjectClicked(target: Id) {
+        Timber.d("onCalendarObjectClicked, id:[$target]")
+        stateReducer.state.value.dataViewState() ?: return
+        viewModelScope.launch {
+            val obj = calendarObjects[target] ?: objectStore.get(target)
+            if (obj != null) {
+                proceedWithNavigation(
+                    obj = obj,
+                    identityProfileLink = obj.getSingleValue(Relations.IDENTITY_PROFILE_LINK)
+                )
+            } else {
+                toast("Record not found. Please, try again later.")
+            }
+        }
+    }
+
+    /**
+     * Creates an object on [date]: its date property is set to noon of that day, as desktop does.
+     * A date property the user cannot set (for example "Creation date") gets no value; the new
+     * object then lands on today by itself.
+     */
+    fun onCalendarCreateObject(date: LocalDate) {
+        Timber.d("onCalendarCreateObject, date:[$date]")
+        if (!isOwnerOrEditor) {
+            toast(NOT_ALLOWED)
+            return
+        }
+        // Shares the flag with the main "+ New" path so two fast taps can't spawn two objects.
+        if (!isObjectCreationInProgress.compareAndSet(false, true)) {
+            Timber.d("onCalendarCreateObject: creation already in progress, skipping")
+            return
+        }
+        val state = stateReducer.state.value.dataViewState()
+        val viewer = state?.viewerByIdOrFirst(session.currentViewerId.value)
+        if (state == null || viewer == null) {
+            isObjectCreationInProgress.set(false)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val relation = viewer.calendarDateRelation(storeOfRelations)
+                val extraPrefilled: Map<Key, Any?> = if (relation != null && !relation.isReadonlyValue) {
+                    mapOf(relation.key to calendarTimestamp(date, ZoneId.systemDefault()).toDouble())
+                } else {
+                    emptyMap()
+                }
+                when (state) {
+                    is ObjectState.DataView.Collection ->
+                        proceedWithAddingObjectToCollection(extraPrefilled = extraPrefilled)
+                    is ObjectState.DataView.TypeSet ->
+                        proceedWithCreatingObjectTypeSetObject(
+                            currentState = state,
+                            templateChosenBy = null,
+                            extraPrefilled = extraPrefilled
+                        )
+                    is ObjectState.DataView.Set ->
+                        proceedWithCreatingSetObject(
+                            currentState = state,
+                            templateChosenBy = null,
+                            extraPrefilled = extraPrefilled
+                        )
+                }
+            } finally {
+                isObjectCreationInProgress.set(false)
+            }
+        }
     }
 
     /**
@@ -1746,6 +2003,8 @@ class ObjectSetViewModel(
         boardRecords.value = emptyMap()
         boardSubscriptionError.value = null
         dataViewOptionsVersion.value = 0
+        calendarObjects = emptyMap()
+        _calendarState.update { it.copy(itemsByDate = emptyMap(), isLoading = true) }
     }
 
     fun onCloseObject() {
@@ -1785,6 +2044,7 @@ class ObjectSetViewModel(
             )
             storelessSubscriptionContainer.unsubscribe(listOf(boardOptionsSubscriptionId))
             storelessSubscriptionContainer.unsubscribe(listOf(dataViewOptionsSubscriptionId))
+            storelessSubscriptionContainer.unsubscribe(listOf(calendarSubscriptionId))
             // Evict Tag/Status option objects this VM merged into the shared store; options still
             // referenced by the record subscription survive (unsubscribe only drops this sub id).
             objectStore.unsubscribe(listOf(dataViewOptionsSubscriptionId))
@@ -4763,6 +5023,13 @@ if (effectiveType.recommendedLayout == ObjectType.Layout.SET || effectiveType.re
             }
             is ViewerLayoutWidgetUi.Action.Type -> {
                 viewModelScope.launch {
+                    // A calendar places objects by a date property. Like desktop, pick one when the
+                    // view has none yet, so the calendar shows objects right after the switch.
+                    val calendarDateKey = if (action.type == DVViewerType.CALENDAR) {
+                        defaultCalendarDateRelationKey()
+                    } else {
+                        null
+                    }
                     proceedWithUpdateViewer(
                         action = {
                             val startTime = System.currentTimeMillis()
@@ -4778,7 +5045,13 @@ if (effectiveType.recommendedLayout == ObjectType.Layout.SET || effectiveType.re
                             }
                         },
                         viewerId = viewerLayoutWidgetState.value.viewer
-                    ) { it.copy(type = action.type) }
+                    ) { viewer ->
+                        if (calendarDateKey != null && viewer.groupRelationKey != calendarDateKey) {
+                            viewer.copy(type = action.type, groupRelationKey = calendarDateKey)
+                        } else {
+                            viewer.copy(type = action.type)
+                        }
+                    }
                 }
             }
 
@@ -4817,6 +5090,25 @@ if (effectiveType.recommendedLayout == ObjectType.Layout.SET || effectiveType.re
                     viewerLayoutWidgetState.value.copy(showGroupByMenu = false)
             }
         }
+    }
+
+    /**
+     * The date property a view switched to the calendar layout should use: its current group
+     * property when that is already a date, otherwise the first date property of the data view,
+     * preferring one the user sets over one the app fills in (such as "Creation date").
+     */
+    private suspend fun defaultCalendarDateRelationKey(): Key? {
+        val state = stateReducer.state.value.dataViewState() ?: return null
+        val viewer = state.viewerById(viewerLayoutWidgetState.value.viewer) ?: return null
+        val current = viewer.groupRelationKey?.takeIf { it.isNotEmpty() }
+        if (current != null && storeOfRelations.getByKey(current)?.format == RelationFormat.DATE) {
+            return current
+        }
+        val options = calendarDateRelationOptions(
+            storeOfRelations = storeOfRelations,
+            relationLinks = state.dataViewContent.relationLinks
+        )
+        return (options.firstOrNull { !it.isReadonlyValue } ?: options.firstOrNull())?.key
     }
 
     private suspend fun proceedWithUpdateViewer(
@@ -5096,6 +5388,7 @@ if (effectiveType.recommendedLayout == ObjectType.Layout.SET || effectiveType.re
         private const val SUBSCRIPTION_TEMPLATES_ID = "-SUBSCRIPTION_TEMPLATES_ID"
         private const val SUBSCRIPTION_BOARD_OPTIONS_POSTFIX = "-board-options"
         private const val SUBSCRIPTION_DATA_VIEW_OPTIONS_POSTFIX = "-dataview-options"
+        private const val SUBSCRIPTION_CALENDAR_POSTFIX = "-calendar"
         const val BOARD_SUBSCRIPTION_ERROR_MSG = "Couldn't load the board. Please reopen the object."
     }
 

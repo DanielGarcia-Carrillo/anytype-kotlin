@@ -157,6 +157,17 @@ private suspend fun DVViewer.getGroupByItems(
     relationLinks: List<RelationLink>
 ): List<ViewerLayoutWidgetUi.State.GroupBy> {
     val selectedGroupKey = groupRelationKey
+    if (type == DVViewerType.CALENDAR) {
+        // The calendar's "group" property is the date that places an object on a day.
+        return calendarDateRelationOptions(storeOfRelations, relationLinks).map { relation ->
+            ViewerLayoutWidgetUi.State.GroupBy(
+                relationKey = RelationKey(relation.key),
+                name = relation.name.orEmpty(),
+                format = relation.format,
+                isChecked = relation.key == selectedGroupKey
+            )
+        }
+    }
     return relationLinks
         .filter { it.format in BOARD_GROUP_BY_FORMATS }
         .mapNotNull { storeOfRelations.getByKey(it.key) }
@@ -238,3 +249,18 @@ private fun MutableList<ViewerLayoutWidgetUi.State.ImagePreview>.addCustomImageP
         }
     )
 }
+/**
+ * Date properties of the data view a calendar can place objects by. Unlike the board's group
+ * properties these include system dates such as "Creation date", as on desktop.
+ */
+suspend fun calendarDateRelationOptions(
+    storeOfRelations: StoreOfRelations,
+    relationLinks: List<RelationLink>
+): List<ObjectWrapper.Relation> = relationLinks
+    .filter { it.format == RelationFormat.DATE }
+    .mapNotNull { storeOfRelations.getByKey(it.key) }
+    .filter { relation ->
+        relation.isValid && relation.format == RelationFormat.DATE &&
+                relation.isHidden != true && relation.isArchived != true
+    }
+    .distinctBy { it.key }

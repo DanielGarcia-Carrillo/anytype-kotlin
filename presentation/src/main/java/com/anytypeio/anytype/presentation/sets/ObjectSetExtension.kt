@@ -351,6 +351,8 @@ fun Viewer.isEmpty(): Boolean =
         // per-column create affordance); only a board with no columns at all has nothing to show.
         is Viewer.Board -> this.columns.isEmpty()
         is Viewer.Unsupported -> false
+        // A calendar always shows its month grid, with or without objects on it.
+        is Viewer.Calendar -> false
     }
 
 fun ObjectWrapper.Basic.toTemplateView(
