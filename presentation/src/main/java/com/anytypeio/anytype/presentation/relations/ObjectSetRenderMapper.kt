@@ -42,6 +42,7 @@ import com.anytypeio.anytype.presentation.mapper.toViewerColumns
 import com.anytypeio.anytype.presentation.number.NumberParser
 import com.anytypeio.anytype.presentation.objects.toObjects
 import com.anytypeio.anytype.presentation.sets.buildBoardViews
+import com.anytypeio.anytype.presentation.sets.calendarDateRelation
 import com.anytypeio.anytype.presentation.sets.boardColumnIds
 import com.anytypeio.anytype.presentation.sets.buildGalleryViews
 import com.anytypeio.anytype.presentation.sets.buildListViews
@@ -166,6 +167,17 @@ suspend fun DVViewer.render(
                     recordsByColumn = boardRecordsByColumn,
                     countsByColumn = boardCountsByColumn
                 )
+            )
+        }
+
+        DVViewerType.CALENDAR -> {
+            val dateRelation = calendarDateRelation(storeOfRelations)
+            Viewer.Calendar(
+                id = id,
+                title = name,
+                dateRelationKey = dateRelation?.key,
+                dateRelationName = dateRelation?.name,
+                hideIcon = hideIcon
             )
         }
 

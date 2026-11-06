@@ -675,6 +675,14 @@
     <string name="view_grid">Grid</string>
     <string name="view_gallery">Gallery</string>
     <string name="view_kanban">Kanban</string>
+    <string name="view_calendar">Calendar</string>
+    <string name="calendar_date_property">Date property</string>
+    <string name="calendar_view_no_date_property">Choose a date property in the view settings to place objects on the calendar.</string>
+    <string name="calendar_view_truncated">These months hold too many objects. Only the first ones are shown.</string>
+    <string name="calendar_view_no_objects">No objects on this day</string>
+    <string name="calendar_view_previous_month">Previous month</string>
+    <string name="calendar_view_next_month">Next month</string>
+    <string name="calendar_view_more_count">+%1$d more</string>
     <string name="dataview_board_no_objects">No objects</string>
     <string name="dataview_board_no_value">No value</string>
     <string name="dataview_board_checked">Checked</string>
