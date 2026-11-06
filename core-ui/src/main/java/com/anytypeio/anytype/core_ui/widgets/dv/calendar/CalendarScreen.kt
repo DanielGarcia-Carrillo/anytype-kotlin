@@ -155,7 +155,9 @@ fun CalendarScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val sideBySide = maxWidth >= 600.dp || maxWidth > maxHeight
         val gridWidth = if (sideBySide) maxWidth * 0.6f else maxWidth
-        val cellWidth = (gridWidth - GRID_HORIZONTAL_PADDING * 2) / 7
+        // Conservative: the side-by-side grid may give up a gutter to the floating buttons.
+        val cellWidth = (gridWidth - GRID_HORIZONTAL_PADDING * 2 -
+                (if (sideBySide) FLOATING_BUTTON_GUTTER else 0.dp)) / 7
         // A phone in landscape is short: tighter header rows leave more height to the grid.
         val isShort = maxHeight < 420.dp
         val monthHeaderHeight = if (isShort) 40.dp else 48.dp
@@ -226,10 +228,19 @@ fun CalendarScreen(
             val headerHeight = monthHeaderHeight + weekDaysHeight + (if (hint != null) HINT_HEIGHT else 0.dp)
             val available = maxHeight - headerHeight - bottomContentInset
             val clearOfButtons = (available - FLOATING_BUTTONS_RESERVE) / 6
-            val rowHeight = if (clearOfButtons >= MIN_ROW_HEIGHT) clearOfButtons
+            val roomUnderGrid = clearOfButtons >= MIN_ROW_HEIGHT
+            val rowHeight = if (roomUnderGrid) clearOfButtons
                 else maxOf(available / 6, MIN_ROW_HEIGHT)
+            // Too short to leave the buttons a strip under the grid (a phone in landscape): leave
+            // them a strip beside it instead, so the search button never covers a day.
+            val buttonsGutter = if (roomUnderGrid) 0.dp else FLOATING_BUTTON_GUTTER
             Row(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.width(gridWidth).fillMaxHeight()) {
+                Column(
+                    modifier = Modifier
+                        .width(gridWidth)
+                        .fillMaxHeight()
+                        .padding(start = buttonsGutter)
+                ) {
                     header()
                     grid(
                         Modifier
@@ -264,6 +275,8 @@ private val GRID_HORIZONTAL_PADDING = 8.dp
 private val HINT_HEIGHT = 24.dp
 /** Height of the floating search and create buttons over the bottom of the screen. */
 private val FLOATING_BUTTONS_RESERVE = 72.dp
+/** Width of the floating search button at the bottom start of the screen. */
+private val FLOATING_BUTTON_GUTTER = 64.dp
 
 @Composable
 private fun MonthHeader(
@@ -422,14 +435,9 @@ private fun DayCell(
         if (showNames) {
             CellNames(items = items, hideIcon = hideIcon, dimmed = !inMonth)
         } else {
-            // Dots sit at the bottom of the cell, under the number when the row is tall and
-            // beside its lower edge when the row is short, so they never fall out of the cell.
-            Box(
-                modifier = Modifier.fillMaxWidth().weight(1f, fill = true).padding(bottom = 3.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                CellDots(count = items.size, dimmed = !inMonth)
-            }
+            // A fixed gap under the number keeps the dots with their own day in a tall row;
+            // MIN_ROW_HEIGHT leaves room for them in a short one.
+            CellDots(count = items.size, dimmed = !inMonth)
         }
     }
 }
@@ -482,6 +490,7 @@ private fun CellNames(items: List<CalendarItem>, hideIcon: Boolean, dimmed: Bool
 @Composable
 private fun CellDots(count: Int, dimmed: Boolean) {
     Row(
+        modifier = Modifier.padding(top = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         val color = colorResource(if (dimmed) R.color.glyph_inactive else R.color.glyph_active)
