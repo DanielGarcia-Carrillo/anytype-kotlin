@@ -52,6 +52,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/default_collection_dv_header_height" />
 
+            <TextView
+                android:id="@+id/unsupportedLayoutWarning"
+                style="@style/dataViewUnsupportedLayoutWarningStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:text="@string/warning_calendar_view_shown_as_grid"
+                tools:visibility="visible" />
+
             <View
                 android:id="@+id/controlDivider2"
                 android:layout_width="match_parent"
