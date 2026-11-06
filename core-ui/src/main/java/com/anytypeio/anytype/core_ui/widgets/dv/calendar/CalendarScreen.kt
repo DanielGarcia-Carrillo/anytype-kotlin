@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -84,7 +85,9 @@ private const val MONTH_SCROLL_RANGE = 1200L
 
 /** Below this width a day cell has no room for names and shows dots instead. */
 private val MIN_CELL_WIDTH_FOR_NAMES = 72.dp
-private val DAY_NUMBER_SIZE = 24.dp
+private val DAY_NUMBER_SIZE = 22.dp
+/** Shortest row that still shows the day number and the dots under it. */
+private val MIN_ROW_HEIGHT = 34.dp
 private val CELL_NAME_HEIGHT = 16.dp
 private val MAX_DOTS = 3
 
@@ -153,10 +156,20 @@ fun CalendarScreen(
         val sideBySide = maxWidth >= 600.dp || maxWidth > maxHeight
         val gridWidth = if (sideBySide) maxWidth * 0.6f else maxWidth
         val cellWidth = (gridWidth - GRID_HORIZONTAL_PADDING * 2) / 7
+        // A phone in landscape is short: tighter header rows leave more height to the grid.
+        val isShort = maxHeight < 420.dp
+        val monthHeaderHeight = if (isShort) 40.dp else 48.dp
+        val weekDaysHeight = if (isShort) 20.dp else 24.dp
+        val hint = when {
+            dateRelationMissing -> stringResource(R.string.calendar_view_no_date_property)
+            state.isTruncated -> stringResource(R.string.calendar_view_truncated)
+            else -> null
+        }
 
         val header: @Composable () -> Unit = {
             MonthHeader(
                 month = visibleMonth,
+                height = monthHeaderHeight,
                 onPrevious = {
                     scope.launch { calendarState.animateScrollToMonth(visibleMonth.minusMonths(1)) }
                 },
@@ -168,12 +181,8 @@ fun CalendarScreen(
                     scope.launch { calendarState.animateScrollToMonth(today.yearMonth) }
                 }
             )
-            if (dateRelationMissing) {
-                Hint(text = stringResource(R.string.calendar_view_no_date_property))
-            } else if (state.isTruncated) {
-                Hint(text = stringResource(R.string.calendar_view_truncated))
-            }
-            WeekDaysRow(state = state)
+            if (hint != null) Hint(text = hint)
+            WeekDaysRow(state = state, height = weekDaysHeight)
         }
 
         val grid: @Composable (Modifier, Boolean) -> Unit = { gridModifier, showNames ->
@@ -210,11 +219,23 @@ fun CalendarScreen(
         }
 
         if (sideBySide) {
+            // The grid fills the column, keeping clear of the floating buttons at the bottom when
+            // there is room for it. Rows never shrink below MIN_ROW_HEIGHT: in a very short
+            // viewport (the object header still expanded) the last rows wait below the edge until
+            // the header collapses, as the rows of the other layouts do.
+            val headerHeight = monthHeaderHeight + weekDaysHeight + (if (hint != null) HINT_HEIGHT else 0.dp)
+            val available = maxHeight - headerHeight - bottomContentInset
+            val clearOfButtons = (available - FLOATING_BUTTONS_RESERVE) / 6
+            val rowHeight = if (clearOfButtons >= MIN_ROW_HEIGHT) clearOfButtons
+                else maxOf(available / 6, MIN_ROW_HEIGHT)
             Row(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.width(gridWidth).fillMaxHeight()) {
                     header()
                     grid(
-                        Modifier.fillMaxWidth().weight(1f).padding(bottom = bottomContentInset),
+                        Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(align = Alignment.Top, unbounded = true)
+                            .height(rowHeight * 6),
                         cellWidth >= MIN_CELL_WIDTH_FOR_NAMES
                     )
                 }
@@ -228,7 +249,7 @@ fun CalendarScreen(
             }
         } else {
             // Rows take a share of the height, within bounds, so the agenda always keeps room.
-            val rowHeight = (maxHeight * 0.55f / 6).coerceIn(40.dp, 72.dp)
+            val rowHeight = (maxHeight * 0.55f / 6).coerceIn(MIN_ROW_HEIGHT + 6.dp, 72.dp)
             Column(modifier = Modifier.fillMaxSize()) {
                 header()
                 grid(Modifier.fillMaxWidth().height(rowHeight * 6), cellWidth >= MIN_CELL_WIDTH_FOR_NAMES)
@@ -240,10 +261,14 @@ fun CalendarScreen(
 }
 
 private val GRID_HORIZONTAL_PADDING = 8.dp
+private val HINT_HEIGHT = 24.dp
+/** Height of the floating search and create buttons over the bottom of the screen. */
+private val FLOATING_BUTTONS_RESERVE = 72.dp
 
 @Composable
 private fun MonthHeader(
     month: YearMonth,
+    height: Dp,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit
@@ -255,7 +280,7 @@ private fun MonthHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
+            .height(height)
             .padding(start = 20.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -320,13 +345,13 @@ private fun Hint(text: String) {
 }
 
 @Composable
-private fun WeekDaysRow(state: CalendarViewState) {
+private fun WeekDaysRow(state: CalendarViewState, height: Dp) {
     val days = remember(state.firstDayOfWeek) { daysOfWeek(state.firstDayOfWeek) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = GRID_HORIZONTAL_PADDING)
-            .height(24.dp),
+            .height(height),
         verticalAlignment = Alignment.CenterVertically
     ) {
         days.forEach { day ->
@@ -368,7 +393,7 @@ private fun DayCell(
             )
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = description }
-            .padding(top = 3.dp, start = 2.dp, end = 2.dp),
+            .padding(top = 2.dp, start = 2.dp, end = 2.dp),
         horizontalAlignment = if (showNames) Alignment.Start else Alignment.CenterHorizontally
     ) {
         Box(
@@ -397,7 +422,14 @@ private fun DayCell(
         if (showNames) {
             CellNames(items = items, hideIcon = hideIcon, dimmed = !inMonth)
         } else {
-            CellDots(count = items.size, dimmed = !inMonth)
+            // Dots sit at the bottom of the cell, under the number when the row is tall and
+            // beside its lower edge when the row is short, so they never fall out of the cell.
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f, fill = true).padding(bottom = 3.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                CellDots(count = items.size, dimmed = !inMonth)
+            }
         }
     }
 }
@@ -450,7 +482,6 @@ private fun CellNames(items: List<CalendarItem>, hideIcon: Boolean, dimmed: Bool
 @Composable
 private fun CellDots(count: Int, dimmed: Boolean) {
     Row(
-        modifier = Modifier.padding(top = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         val color = colorResource(if (dimmed) R.color.glyph_inactive else R.color.glyph_active)
