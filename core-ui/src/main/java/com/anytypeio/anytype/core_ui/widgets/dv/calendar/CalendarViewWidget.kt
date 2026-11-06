@@ -29,7 +29,7 @@ class CalendarViewWidget @JvmOverloads constructor(
 ) : AbstractComposeView(context, attrs, defStyleAttr) {
 
     private var viewer by mutableStateOf<Viewer.Calendar?>(null)
-    private var state by mutableStateOf(CalendarViewState())
+    private var viewState by mutableStateOf(CalendarViewState())
     private var bottomContentInsetPixels by mutableIntStateOf(0)
 
     var onMonthChanged: (YearMonth) -> Unit = {}
@@ -43,8 +43,8 @@ class CalendarViewWidget @JvmOverloads constructor(
     override fun Content() {
         val current = viewer ?: return
         // Objects loaded for another view must not show on this one while its range loads.
-        val shown = if (state.viewerId == current.id) state
-            else state.copy(itemsByDate = emptyMap(), isLoading = true, isTruncated = false)
+        val shown = if (viewState.viewerId == current.id) viewState
+            else viewState.copy(itemsByDate = emptyMap(), isLoading = true, isTruncated = false)
         // A new view starts on its own month and selection.
         key(current.id) {
             CalendarScreen(
@@ -64,7 +64,7 @@ class CalendarViewWidget @JvmOverloads constructor(
     }
 
     fun setState(calendarState: CalendarViewState) {
-        state = calendarState
+        viewState = calendarState
     }
 
     fun setBottomContentInset(pixels: Int) {
