@@ -60,6 +60,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil3.load
 import com.anytypeio.anytype.R
+import com.anytypeio.anytype.core_models.DVViewerType
 import com.anytypeio.anytype.core_models.Id
 import com.anytypeio.anytype.core_models.Key
 import com.anytypeio.anytype.core_models.ObjectType
@@ -1306,6 +1307,7 @@ open class ObjectSetFragment :
             }
         }
         binding.gridContainer.root.isVisible = viewer is Viewer.GridView
+        updateUnsupportedLayoutWarning(viewer)
         when (viewer) {
             is Viewer.GridView -> {
                 with(binding) {
@@ -1412,6 +1414,25 @@ open class ObjectSetFragment :
                     unsupportedViewError.text = null
                 }
             }
+        }
+    }
+
+    /**
+     * Warns that the grid stands in for a layout Android cannot draw yet, such as a calendar.
+     * The warning sits in the pinned controls, so a change of its visibility changes the
+     * geometry of the scroll host.
+     */
+    private fun updateUnsupportedLayoutWarning(viewer: Viewer?) {
+        val warning = when ((viewer as? Viewer.GridView)?.unsupportedLayout) {
+            DVViewerType.CALENDAR -> R.string.warning_calendar_view_shown_as_grid
+            else -> null
+        }
+        val banner = binding.unsupportedLayoutWarning
+        if (warning != null) banner.setText(warning)
+        val isVisible = warning != null
+        if (banner.isVisible != isVisible) {
+            banner.isVisible = isVisible
+            binding.scrollHost.invalidateGeometry()
         }
     }
 

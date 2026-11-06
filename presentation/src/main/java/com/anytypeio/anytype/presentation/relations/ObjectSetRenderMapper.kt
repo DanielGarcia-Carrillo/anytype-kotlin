@@ -169,6 +169,20 @@ suspend fun DVViewer.render(
             )
         }
 
+        DVViewerType.CALENDAR -> {
+            // Android cannot draw a calendar yet. Show the records of the view as a grid,
+            // and let the screen warn that the view really is a calendar.
+            buildGridView(
+                dataViewRelations = dataViewRelations,
+                objects = objects,
+                builder = builder,
+                store = store,
+                objectOrderIds = objectOrderIds,
+                fieldParser = fieldParser,
+                storeOfObjectTypes = storeOfObjectTypes
+            ).copy(unsupportedLayout = DVViewerType.CALENDAR)
+        }
+
         else -> {
             if (useFallbackView) {
                 buildGridView(
@@ -185,9 +199,6 @@ suspend fun DVViewer.render(
                     id = id,
                     title = name,
                     type = when (type) {
-                        DVViewerType.CALENDAR -> {
-                            Viewer.Unsupported.TYPE_CALENDAR
-                        }
                         DVViewerType.GRAPH -> {
                             Viewer.Unsupported.TYPE_GRAPH
                         }
@@ -215,7 +226,7 @@ private suspend fun DVViewer.buildGridView(
     objectOrderIds: List<Id>,
     fieldParser: FieldParser,
     storeOfObjectTypes: StoreOfObjectTypes
-): Viewer {
+): Viewer.GridView {
     val vmap = viewerRelations.associateBy { it.key }
     val visibleRelations = dataViewRelations.filter { relation ->
         val vr = vmap[relation.key]

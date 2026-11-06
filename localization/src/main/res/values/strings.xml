@@ -1464,6 +1464,7 @@
 
     <string name="error_kanban_view_not_supported">Kanban view is not available on mobile yet.\nChange view type (Settings -> View) or create a new one to access your data.</string>
     <string name="error_calendar_view_not_supported">Calendar view is not available on mobile yet.\nChange view type (Settings -> View) or create a new one to access your data.</string>
+    <string name="warning_calendar_view_shown_as_grid">Calendar view is not available on Android yet, so this view is shown as a grid.</string>
     <string name="error_graph_view_not_supported">Graph view is not available on mobile yet.\nChange view type (Settings -> View) or create a new one to access your data.</string>
     <string name="error_generic_view_not_supported">This view is not available on mobile yet.\nChange view type (Settings -> View) or create a new one to access your data.</string>
 

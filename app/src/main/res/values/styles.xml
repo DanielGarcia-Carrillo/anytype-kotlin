@@ -36,6 +36,15 @@
         <item name="android:textColor">@color/text_tertiary</item>
     </style>
 
+    <style name="dataViewUnsupportedLayoutWarningStyle" parent="TextView.UXStyle.Captions.1.Regular">
+        <item name="android:background">@color/background_highlighted_light</item>
+        <item name="android:paddingStart">@dimen/dp_20</item>
+        <item name="android:paddingEnd">@dimen/dp_20</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
     <style name="WidgetOverlayBottomSheetTheme" parent="Theme.Design.Light.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/WidgetOverlayBottomSheetStyle</item>
         <item name="android:windowIsFloating">false</item>

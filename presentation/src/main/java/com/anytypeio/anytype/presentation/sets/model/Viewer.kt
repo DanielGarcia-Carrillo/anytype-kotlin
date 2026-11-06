@@ -1,6 +1,7 @@
 package com.anytypeio.anytype.presentation.sets.model
 
 import android.os.Parcelable
+import com.anytypeio.anytype.core_models.DVViewerType
 import com.anytypeio.anytype.core_models.Id
 import com.anytypeio.anytype.core_models.ObjectType
 import com.anytypeio.anytype.core_models.Url
@@ -29,11 +30,16 @@ sealed class Viewer {
         }
     }
 
+    /**
+     * @property [unsupportedLayout] the layout the view really has, when Android cannot draw
+     * that layout yet and shows the records as a grid instead. Null for a real grid view.
+     */
     data class GridView(
         override val id: String,
         val name: String,
         val columns: List<ColumnView>,
-        val rows: @RawValue List<Row> = listOf()
+        val rows: @RawValue List<Row> = listOf(),
+        val unsupportedLayout: DVViewerType? = null
     ) : Viewer() {
 
         override val title: String get() = name
