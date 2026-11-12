@@ -164,6 +164,7 @@ private fun ViewerLayoutContent(
         )
         val isGallery = currentState.layoutType == DVViewerType.GALLERY
         val isBoard = currentState.layoutType == DVViewerType.BOARD
+        val isCalendar = currentState.layoutType == DVViewerType.CALENDAR
 
         if (isGallery) {
             Divider()
@@ -219,6 +220,20 @@ private fun ViewerLayoutContent(
                 text = stringResource(id = R.string.color_columns),
                 checked = currentState.groupBackgroundColors.toggled,
                 onCheckedChanged = { action(ViewerLayoutWidgetUi.Action.ColorColumns(it)) }
+            )
+        }
+
+        // The calendar places objects on days by a date property, picked like a group property.
+        if (isCalendar) {
+            Divider()
+            ColumnItem(
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp),
+                title = stringResource(id = R.string.calendar_date_property),
+                value = currentState.groupByItems
+                    .firstOrNull { it.isChecked }?.name
+                    ?: stringResource(id = R.string.none),
+                onClick = { action(ViewerLayoutWidgetUi.Action.GroupByMenu) },
+                arrow = painterResource(id = R.drawable.ic_arrow_disclosure_18)
             )
         }
     }
@@ -348,28 +363,19 @@ fun LayoutIcons(uiState: ViewerLayoutWidgetUi, action: (ViewerLayoutWidgetUi.Act
                 contentDescription = stringResource(id = R.string.view_kanban),
                 click = { action(ViewerLayoutWidgetUi.Action.Type(DVViewerType.BOARD)) }
             )
-            LayoutIcon(
-                modifier = itemModifier
-                    .padding(top = 8.dp)
-                    .alpha(0F),
-                uiState = uiState,
-                layoutType = DVViewerType.BOARD,
-                imageResourceSelected = R.drawable.ic_layout_kanban_selected,
-                imageResource = R.drawable.ic_layout_kanban,
-                contentDescription = "",
-                click = { }
-            )
-            LayoutIcon(
-                modifier = itemModifier
-                    .padding(top = 8.dp)
-                    .alpha(0F),
-                uiState = uiState,
-                layoutType = DVViewerType.BOARD,
-                imageResourceSelected = R.drawable.ic_layout_kanban_selected,
-                imageResource = R.drawable.ic_layout_kanban,
-                contentDescription = "",
-                click = { }
-            )
+        }
+        LayoutIcon(
+            modifier = itemModifier.padding(top = 8.dp),
+            uiState = uiState,
+            layoutType = DVViewerType.CALENDAR,
+            imageResourceSelected = R.drawable.ic_layout_calendar_selected,
+            imageResource = R.drawable.ic_layout_calendar,
+            contentDescription = stringResource(id = R.string.view_calendar),
+            click = { action(ViewerLayoutWidgetUi.Action.Type(DVViewerType.CALENDAR)) }
+        )
+        // Invisible fillers keep the last row's icons at the width of the first row's.
+        repeat(if (uiState.kanbanEnabled) 1 else 2) {
+            Spacer(modifier = itemModifier.padding(top = 8.dp))
         }
     }
 }

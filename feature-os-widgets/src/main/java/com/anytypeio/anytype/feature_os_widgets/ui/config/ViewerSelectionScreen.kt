@@ -153,7 +153,7 @@ private fun viewerTypeIcon(type: Block.Content.DataView.Viewer.Type): Int {
         Block.Content.DataView.Viewer.Type.LIST -> R.drawable.ic_layout_list
         Block.Content.DataView.Viewer.Type.GALLERY -> R.drawable.ic_layout_gallery
         Block.Content.DataView.Viewer.Type.BOARD -> R.drawable.ic_layout_kanban
-        Block.Content.DataView.Viewer.Type.CALENDAR -> R.drawable.ic_layout_grid // fallback
+        Block.Content.DataView.Viewer.Type.CALENDAR -> R.drawable.ic_layout_calendar
         Block.Content.DataView.Viewer.Type.GRAPH -> R.drawable.ic_layout_grid // fallback
     }
 }

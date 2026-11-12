@@ -31,6 +31,11 @@ licensee {
         because("Facebook Shimmer is BSD-licensed")
     }
 
+    // kizitonwose/Calendar: its POM names "MIT License" but links the license file on GitHub
+    allowUrl("https://github.com/kizitonwose/calendar/blob/main/LICENSE.md") {
+        because("kizitonwose/Calendar is MIT-licensed (verified in repository)")
+    }
+
     // BouncyCastle
     allowUrl("https://www.bouncycastle.org/licence.html") {
         because("BouncyCastle is MIT-licensed")

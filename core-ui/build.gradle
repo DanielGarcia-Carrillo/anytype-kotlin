@@ -60,6 +60,7 @@ dependencies {
     implementation libs.coilVideo
     implementation libs.composeConstraintLayout
     implementation libs.composeReorderable
+    implementation libs.composeCalendar
     implementation libs.composeQrCode
 
     testImplementation libs.fragmentTesting

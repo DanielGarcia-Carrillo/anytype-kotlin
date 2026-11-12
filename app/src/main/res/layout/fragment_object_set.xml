@@ -96,6 +96,12 @@
                 android:layout_height="match_parent"
                 android:visibility="gone" />
 
+            <com.anytypeio.anytype.core_ui.widgets.dv.calendar.CalendarViewWidget
+                android:id="@+id/calendarView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/unsupportedViewError"
                 style="@style/dataViewUnsupportedViewErrorStyle"
