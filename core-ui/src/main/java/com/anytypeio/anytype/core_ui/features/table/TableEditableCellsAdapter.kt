@@ -1,7 +1,6 @@
 package com.anytypeio.anytype.core_ui.features.table
 
 import android.graphics.Rect
-import android.text.Editable
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.TouchDelegate
@@ -110,10 +109,7 @@ class TableEditableCellsAdapter(
                     }
                 },
                 onEmptyBlockBackspaceClicked = {},
-                // A cell is one block: Enter adds a line break inside it instead of splitting it.
-                onSplitLineEnterClicked = { _, editable, range ->
-                    editable.insertLineBreak(range)
-                },
+                onSplitLineEnterClicked = { _, _, _ -> },
                 onNonEmptyBlockBackspaceClicked = { _, _ -> },
                 onMentionEvent = { mentionEvent ->
                     onMentionEvent(
@@ -162,16 +158,6 @@ class TableEditableCellsAdapter(
 
     override fun getItemCount(): Int = items.size
 
-}
-
-/**
- * Replaces the selected [range] with a line break. The text watcher then saves the cell, and
- * the cursor lands after the break.
- */
-fun Editable.insertLineBreak(range: IntRange) {
-    val start = minOf(range.first, range.last).coerceIn(0, length)
-    val end = maxOf(range.first, range.last).coerceIn(0, length)
-    replace(start, end, "\n")
 }
 
 fun View.expandCellHitArea(parent: View) {
