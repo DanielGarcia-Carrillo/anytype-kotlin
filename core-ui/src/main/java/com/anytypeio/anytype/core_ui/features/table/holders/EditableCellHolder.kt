@@ -30,6 +30,9 @@ class EditableCellHolder(
 
     init {
         setupTableCell()
+        // The layout's minimum height fits two lines of text, so a row with
+        // one line looked two lines tall. A cell takes the height of its text, as on desktop.
+        root.minimumHeight = 0
         with(itemView.context) {
             mentionIconSize =
                 resources.getDimensionPixelSize(R.dimen.mention_span_image_size_default)
