@@ -3,11 +3,15 @@ package com.anytypeio.anytype.core_ui.features.editor.table
 import android.content.Context
 import android.os.Build
 import android.text.SpannableStringBuilder
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import com.anytypeio.anytype.core_ui.R
 import com.anytypeio.anytype.core_ui.features.table.TableEditableCellsAdapter
+import com.anytypeio.anytype.core_ui.features.table.holders.EditableCellHolder
 import com.anytypeio.anytype.core_ui.features.table.insertLineBreak
 import com.anytypeio.anytype.core_ui.tools.ClipboardInterceptor
 import com.anytypeio.anytype.core_models.Url
@@ -58,8 +62,7 @@ class TableCellLineTest {
     fun `enter in a cell adds a line break and saves the cell`() {
         val changes = mutableListOf<String>()
         val adapter = givenAdapter(text = "ab") { changes.add(it.text) }
-        val holder = adapter.onCreateViewHolder(FrameLayout(context), 0)
-        adapter.bindViewHolder(holder, 0)
+        val holder = givenBoundHolder(adapter)
 
         holder.content.setSelection(1)
         holder.content.onEditorAction(EditorInfo.IME_ACTION_GO)
@@ -74,6 +77,21 @@ class TableCellLineTest {
         val adapter = givenAdapter(text = "ab") {}
         val holder = adapter.onCreateViewHolder(FrameLayout(context), 0)
         assertEquals(0, holder.root.minimumHeight)
+    }
+
+    /**
+     * The holder finds its block through its adapter position, so it must be laid out by a
+     * RecyclerView.
+     */
+    private fun givenBoundHolder(adapter: TableEditableCellsAdapter): EditableCellHolder {
+        val recycler = RecyclerView(context).apply {
+            layoutManager = LinearLayoutManager(context)
+            this.adapter = adapter
+        }
+        val spec = View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY)
+        recycler.measure(spec, spec)
+        recycler.layout(0, 0, 1000, 1000)
+        return recycler.findViewHolderForAdapterPosition(0) as EditableCellHolder
     }
 
     private fun givenAdapter(
