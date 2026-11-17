@@ -164,6 +164,18 @@ android {
             }
         }
 
+        // The optimized build of the dev app: a release build (R8, not debuggable) that
+        // keeps the dev identity of the debug build (io.anytype.app.dev, Dev-Anytype, dev icon,
+        // dev Firebase app and the debug Amplitude key). It installs next to the store app and
+        // never shares its data, and it signs with the local debug key, so anyone can build it.
+        devRelease {
+            initWith release
+            applicationIdSuffix ".dev"
+            buildConfigField("String", "AMPLITUDE_KEY", apikeyProperties['amplitude.debug'])
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+        }
+
         applicationVariants.configureEach { variant ->
             if (variant.buildType.name == 'release') {
                 variant.outputs.configureEach { output ->
@@ -176,6 +188,13 @@ android {
                         .replace("-universal", "")
                 }
             }
+        }
+    }
+
+    sourceSets {
+        // The dev release build reuses the resources of the debug build: its name and icon.
+        devRelease {
+            res.srcDirs += 'src/debug/res'
         }
     }
 
