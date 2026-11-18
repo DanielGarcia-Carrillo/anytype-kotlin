@@ -1,0 +1,39 @@
+on:
+  workflow_dispatch:
+  pull_request:
+    # add "synchronize" in "types", in order to trigger workflow for pull request commit(s) pushes.
+    types: [ opened ]
+    branches: [ main, release/**]
+name: Run debug unit tests
+jobs:
+  setup-android:
+    runs-on: ubuntu-latest
+    steps:
+      -  uses: actions/checkout@v3
+      -  uses: actions/setup-java@v3
+         with:
+          distribution: "zulu"
+          java-version: 17
+
+      - name: Setup middleware dependency
+        env:
+          token_secret: ${{ secrets.ANYTYPE_SECRET }}
+          user_secret: ${{ secrets.ANYTYPE_USER_SECRET }}
+          amplitude_secret: ${{ secrets.ANYTYPE_AMPLITUDE_SECRET }}
+          amplitude_secret_debug: ${{ secrets.ANYTYPE_AMPLITUDE_DEBUG_SECRET }}
+          sentry_dsn_secret: ${{ secrets.ANYTYPE_SENTRY_DSN_SECRET }}
+        run: ./middleware2.sh $token_secret $user_secret $amplitude_secret $amplitude_secret_debug $sentry_dsn_secret
+
+      - name: Check licenses
+        run: ./gradlew :app:licenseeRelease
+
+      - name: Compile android test sources
+        run: make compile_android_test_sources
+
+      - name: Run unit tests
+        run: make test_debug_all
+
+      - name: Android test report
+        uses: asadmansr/android-test-report-action@v1.2.0
+        if: ${{ always() }} # IMPORTANT: run Android Test Report regardless
+
