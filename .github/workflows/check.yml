@@ -1,0 +1,40 @@
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches: [ main, release/**]
+name: Run debug unit tests
+jobs:
+  setup-android:
+    runs-on: ubuntu-latest
+    steps:
+      -  uses: actions/checkout@v3
+      -  uses: actions/setup-java@v3
+         with:
+          distribution: "zulu"
+          java-version: 17
+
+      - name: Setup middleware dependency
+        env:
+          # Without anyproto's secrets (in a fork), read the middleware package with the
+          # fork's FORK_TOKEN and use placeholder analytics keys: unit tests don't use them.
+          token_secret: ${{ secrets.ANYTYPE_SECRET || secrets.FORK_TOKEN }}
+          user_secret: ${{ secrets.ANYTYPE_USER_SECRET || github.repository_owner }}
+          amplitude_secret: ${{ secrets.ANYTYPE_AMPLITUDE_SECRET || 'unset' }}
+          amplitude_secret_debug: ${{ secrets.ANYTYPE_AMPLITUDE_DEBUG_SECRET || 'unset' }}
+          sentry_dsn_secret: ${{ secrets.ANYTYPE_SENTRY_DSN_SECRET || 'unset' }}
+        run: ./middleware2.sh $token_secret $user_secret $amplitude_secret $amplitude_secret_debug $sentry_dsn_secret
+
+      - name: Check licenses
+        run: ./gradlew :app:licenseeRelease
+
+      - name: Compile android test sources
+        run: make compile_android_test_sources
+
+      - name: Run unit tests
+        run: make test_debug_all
+
+      - name: Android test report
+        uses: asadmansr/android-test-report-action@v1.2.0
+        if: ${{ always() }} # IMPORTANT: run Android Test Report regardless
+
