@@ -5,8 +5,7 @@
     android:id="@+id/cellRoot"
     android:layout_width="140dp"
     android:layout_height="wrap_content"
-    android:minWidth="@dimen/item_block_table_cell_width"
-    android:minHeight="@dimen/item_block_table_cell_height">
+    android:minWidth="@dimen/item_block_table_cell_width">
 
     <com.anytypeio.anytype.core_ui.widgets.text.TextInputWidget
         android:id="@+id/textContent"
