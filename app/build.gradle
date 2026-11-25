@@ -164,6 +164,15 @@ android {
             }
         }
 
+        // Fork-only: a release-like build that installs next to the official app,
+        // with its own name and a tinted icon (see src/fork).
+        fork {
+            initWith release
+            applicationIdSuffix ".fork"
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+        }
+
         applicationVariants.configureEach { variant ->
             if (variant.buildType.name == 'release') {
                 variant.outputs.configureEach { output ->
